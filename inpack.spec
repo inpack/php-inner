@@ -1,6 +1,6 @@
 [project]
 name = php-inner
-version = 0.1.0
+version = 0.1.1
 vendor = sysinner.com
 homepage = http://www.sysinner.com
 groups = dev/sys-runtime

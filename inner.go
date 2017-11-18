@@ -29,51 +29,65 @@ import (
 	"github.com/sysinner/incore/inapi"
 )
 
+type mod struct {
+	name     string
+	priority int
+}
+
+func mod_get(name string) int {
+	for _, v := range php_mods {
+		if v.name == name {
+			return v.priority
+		}
+	}
+	return 0
+}
+
 var (
 	pod_inst    = "/home/action/.sysinner/pod_instance.json"
 	pod_inagent = "/home/action/.sysinner/inagent"
 	php_prefix  = "/home/action/apps/%s"
 	php_ini     = "/home/action/apps/%s/etc/php.ini"
-	php_modini  = "/home/action/apps/%s/etc/php.d/modules.ini"
+	php_modini  = "/home/action/apps/%s/etc/php.d/%s.ini"
 	php_fpmcfg  = "/home/action/apps/%s/etc/php-fpm.conf"
 	php_fpmwww  = "/home/action/apps/%s/etc/php-fpm.d/www.conf"
 	php_defs    = types.ArrayString([]string{"php56", "php71", "php72"})
 	php_def     = "php71"
-	php_mods    = types.ArrayString([]string{
-		"bcmath",
-		"bz2",
-		"ctype",
-		"curl",
-		"exif",
-		"ftp",
-		"gd",
-		"gettext",
-		"gmp",
-		"iconv",
-		"intl",
-		"json",
-		"mbstring",
-		"mcrypt",
-		"mysqli",
-		"mysqlnd",
-		"opcache",
-		"pdo",
-		"pdo_mysql",
-		"pdo_pgsql",
-		"pdo_sqlite",
-		"pgsql",
-		"pspell",
-		"simplexml",
-		"soap",
-		"sockets",
-		"sqlite3",
-		"tokenizer",
-		"wddx",
-		"xmlrpc",
-		"xml",
-		"xsl",
-		"zip",
-	})
+	php_mods    = []mod{
+		{"opcache", 10},
+		{"bcmath", 20},
+		{"bz2", 20},
+		{"ctype", 20},
+		{"curl", 20},
+		{"exif", 20},
+		{"ftp", 20},
+		{"gd", 20},
+		{"gettext", 20},
+		{"gmp", 20},
+		{"iconv", 20},
+		{"intl", 20},
+		{"json", 20},
+		{"mbstring", 20},
+		{"mcrypt", 20},
+		{"mysqlnd", 20},
+		{"pgsql", 20},
+		{"pspell", 20},
+		{"simplexml", 20},
+		{"soap", 20},
+		{"sockets", 20},
+		{"sqlite3", 20},
+		{"tokenizer", 20},
+		{"xml", 20},
+		{"xsl", 20},
+		{"zip", 20},
+		{"mysqli", 30},
+		{"pdo", 30},
+		{"pdo_mysql", 30},
+		{"pdo_pgsql", 30},
+		{"pdo_sqlite", 30},
+		{"wddx", 30},
+		{"xmlrpc", 30},
+	}
 )
 
 func main() {
@@ -82,21 +96,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	if _, ok := hflag.Value("php"); ok {
+	if _, ok := hflag.Value("php-init"); ok {
 		if err := base_set(); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 	}
 
-	if v, ok := hflag.Value("php_modules"); ok {
+	if v, ok := hflag.Value("php-modules"); ok {
 		if err := module_sets(v.String()); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 	}
 
-	if _, ok := hflag.Value("php_fpm"); ok {
+	if _, ok := hflag.Value("php-fpm-on"); ok {
 		if err := fpm_on(); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -198,41 +212,55 @@ func fpm_on() error {
 }
 
 func module_sets(v string) error {
-	modules := ""
 
-	var (
-		vs  = strings.Split(v, ",")
-		vs2 types.ArrayString
-	)
+	vs := types.ArrayString(strings.Split(v, ","))
+
 	for _, m := range vs {
-		if php_mods.Has(m) {
-			if strings.HasPrefix(m, "pdo_") {
-				vs2.Set("pdo")
+		if strings.HasPrefix(m, "pdo_") {
+			switch m {
+			case "pdo_mysql":
+				vs.Set("mysqlnd")
+
+			case "pdo_pgsql":
+				vs.Set("pgsql")
+
+			case "pdo_sqlite":
+				vs.Set("sqlite3")
 			}
-			vs2.Set(m)
+			vs.Set("pdo")
 		}
 	}
 
-	for _, m := range vs2 {
-		modules += fmt.Sprintf("extension=%s.so\n", m)
+	if v == "all" {
+		for _, m := range php_mods {
+			vs.Set(m.name)
+		}
 	}
 
-	if len(modules) > 0 {
-
-		fp, err := os.OpenFile(fmt.Sprintf(php_modini, php_def), os.O_RDWR|os.O_CREATE, 0644)
-		if err != nil {
-			return err
-		}
-
-		fp.Seek(0, 0)
-		fp.Truncate(0)
-		_, err = fp.Write([]byte(modules))
-		if err != nil {
-			return err
+	for _, m := range vs {
+		if priority := mod_get(m); priority > 0 {
+			mod_body := fmt.Sprintf("extension=%s.so\n", m)
+			if err := module_set_file(fmt.Sprintf("%d-%s", priority, m), mod_body); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
+}
+
+func module_set_file(name string, s string) error {
+
+	fp, err := os.OpenFile(fmt.Sprintf(php_modini, php_def, name), os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+
+	fp.Seek(0, 0)
+	fp.Truncate(0)
+	_, err = fp.Write([]byte(s))
+
+	return err
 }
 
 func pod_init() error {
