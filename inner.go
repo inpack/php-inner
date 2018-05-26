@@ -51,8 +51,8 @@ var (
 	php_modini  = "/home/action/apps/%s/etc/php.d/%s.ini"
 	php_fpmcfg  = "/home/action/apps/%s/etc/php-fpm.conf"
 	php_fpmwww  = "/home/action/apps/%s/etc/php-fpm.d/www.conf"
-	php_defs    = types.ArrayString([]string{"php56", "php71", "php72"})
-	php_def     = "php71"
+	php_rels    = types.ArrayString([]string{"php56", "php71", "php72"})
+	php_rel     = "php71"
 	php_mods    = []mod{
 		{"opcache", 10},
 		{"bcmath", 20},
@@ -96,6 +96,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if v, ok := hflag.Value("php-rel"); ok && !php_rels.Has(v.String()) {
+		fmt.Println("invalid php-rel")
+		os.Exit(1)
+	}
+
 	if _, ok := hflag.Value("php-init"); ok {
 		if err := base_set(); err != nil {
 			fmt.Println(err)
@@ -120,7 +125,7 @@ func main() {
 
 func base_set() error {
 
-	php_ini_path := fmt.Sprintf(php_ini, php_def)
+	php_ini_path := fmt.Sprintf(php_ini, php_rel)
 
 	fp, err := os.Open(php_ini_path + ".default")
 	if err != nil {
@@ -164,8 +169,8 @@ func base_set() error {
 func fpm_on() error {
 
 	cfgs := []string{
-		fmt.Sprintf(php_fpmcfg, php_def),
-		fmt.Sprintf(php_fpmwww, php_def),
+		fmt.Sprintf(php_fpmcfg, php_rel),
+		fmt.Sprintf(php_fpmwww, php_rel),
 	}
 
 	sets := map[string]string{}
@@ -251,7 +256,7 @@ func module_sets(v string) error {
 
 func module_set_file(name string, s string) error {
 
-	fp, err := os.OpenFile(fmt.Sprintf(php_modini, php_def, name), os.O_RDWR|os.O_CREATE, 0644)
+	fp, err := os.OpenFile(fmt.Sprintf(php_modini, php_rel, name), os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
@@ -278,13 +283,13 @@ func pod_init() error {
 
 	for _, app := range inst.Apps {
 		for _, p := range app.Spec.Packages {
-			if php_defs.Has(p.Name) {
-				php_def = p.Name
+			if php_rels.Has(p.Name) {
+				php_rel = p.Name
 				break
 			}
 		}
 	}
 
-	_, err := os.Stat(fmt.Sprintf(php_prefix+"/bin/php", php_def))
+	_, err := os.Stat(fmt.Sprintf(php_prefix+"/bin/php", php_rel))
 	return err
 }
