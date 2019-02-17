@@ -24,9 +24,8 @@ import (
 	"text/template"
 
 	"github.com/hooto/hflag4g/hflag"
-	"github.com/lessos/lessgo/encoding/json"
 	"github.com/lessos/lessgo/types"
-	"github.com/sysinner/incore/inapi"
+	"github.com/sysinner/incore/inconf"
 )
 
 type mod struct {
@@ -44,16 +43,14 @@ func mod_get(name string) int {
 }
 
 var (
-	pod_inst    = "/home/action/.sysinner/pod_instance.json"
-	pod_inagent = "/home/action/.sysinner/inagent"
-	php_prefix  = "/home/action/apps/%s"
-	php_ini     = "/home/action/apps/%s/etc/php.ini"
-	php_modini  = "/home/action/apps/%s/etc/php.d/%s.ini"
-	php_fpmcfg  = "/home/action/apps/%s/etc/php-fpm.conf"
-	php_fpmwww  = "/home/action/apps/%s/etc/php-fpm.d/www.conf"
-	php_rels    = types.ArrayString([]string{"php56", "php71", "php72"})
-	php_rel     = "php71"
-	php_mods    = []mod{
+	php_prefix = "/home/action/apps/%s"
+	php_ini    = "/home/action/apps/%s/etc/php.ini"
+	php_modini = "/home/action/apps/%s/etc/php.d/%s.ini"
+	php_fpmcfg = "/home/action/apps/%s/etc/php-fpm.conf"
+	php_fpmwww = "/home/action/apps/%s/etc/php-fpm.d/www.conf"
+	php_rels   = types.ArrayString([]string{"php56", "php71", "php72", "php73"})
+	php_rel    = "php71"
+	php_mods   = []mod{
 		{"opcache", 10},
 		{"bcmath", 20},
 		{"bz2", 20},
@@ -88,9 +85,16 @@ var (
 		{"wddx", 30},
 		{"xmlrpc", 30},
 	}
+	phpPodCfr *inconf.PodConfigurator
+	appSpec   = "sysinner-php"
 )
 
 func main() {
+
+	if v, ok := hflag.ValueOK("app-spec"); ok {
+		appSpec = v.String()
+	}
+
 	if err := pod_init(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -270,25 +274,43 @@ func module_set_file(name string, s string) error {
 
 func pod_init() error {
 
-	var inst inapi.Pod
-	if err := json.DecodeFile(pod_inst, &inst); err != nil {
-		return err
-	}
+	var (
+		podCfr *inconf.PodConfigurator
+		err    error
+	)
 
-	if inst.Spec == nil ||
-		inst.Spec.Box.Resources == nil {
-		return errors.New("Not Pod Instance Setup")
-	}
+	if phpPodCfr != nil {
+		podCfr = phpPodCfr
 
-	for _, app := range inst.Apps {
-		for _, p := range app.Spec.Packages {
-			if php_rels.Has(p.Name) {
-				php_rel = p.Name
-				break
-			}
+		if !podCfr.Update() {
+			return nil
+		}
+
+	} else {
+
+		if podCfr, err = inconf.NewPodConfigurator(); err != nil {
+			return err
 		}
 	}
 
-	_, err := os.Stat(fmt.Sprintf(php_prefix+"/bin/php", php_rel))
+	appCfr := podCfr.AppConfigurator(appSpec)
+	if appCfr == nil {
+		return errors.New("No AppSpec (" + appSpec + ") Found")
+	}
+
+	appSpec := appCfr.AppSpec()
+
+	for _, p := range appSpec.Packages {
+		if php_rels.Has(p.Name) {
+			php_rel = p.Name
+			break
+		}
+	}
+
+	_, err = os.Stat(fmt.Sprintf(php_prefix+"/bin/php", php_rel))
+	if err == nil {
+		phpPodCfr = podCfr
+	}
+
 	return err
 }
