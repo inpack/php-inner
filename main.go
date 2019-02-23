@@ -43,12 +43,12 @@ func mod_get(name string) int {
 }
 
 var (
-	php_prefix = "/home/action/apps/%s"
-	php_ini    = "/home/action/apps/%s/etc/php.ini"
-	php_modini = "/home/action/apps/%s/etc/php.d/%s.ini"
-	php_fpmcfg = "/home/action/apps/%s/etc/php-fpm.conf"
-	php_fpmwww = "/home/action/apps/%s/etc/php-fpm.d/www.conf"
-	php_rels   = types.ArrayString([]string{"php56", "php71", "php72", "php73"})
+	php_prefix = "/opt/php/%s"
+	php_ini    = "/opt/php/%s/etc/php.ini"
+	php_modini = "/opt/php/%s/etc/php.d/%s.ini"
+	php_fpmcfg = "/opt/php/%s/etc/php-fpm.conf"
+	php_fpmwww = "/opt/php/%s/etc/php-fpm.d/www.conf"
+	php_rels   = types.ArrayString([]string{"php71", "php72", "php73"})
 	php_rel    = "php71"
 	php_mods   = []mod{
 		{"opcache", 10},
