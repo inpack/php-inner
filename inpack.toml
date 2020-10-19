@@ -1,0 +1,27 @@
+[project]
+  name = "php-keeper"
+  version = "0.10.0"
+  vendor = "sysinner.com"
+  homepage = "http://www.sysinner.com"
+  description = "configuration management tool for php"
+  groups = ["dev/sys-runtime"]
+
+[files]
+  allow = "LICENSE\nmisc/"
+
+[scripts]
+  build = """
+mkdir -p {{.buildroot}}/bin
+CGO_ENABLED=0 GOOS=linux go build -o {{.buildroot}}/bin/php-keeper -a -tags netgo -ldflags '-w -s' main.go
+
+install misc/php-init {{.buildroot}}/bin/php71-init
+install misc/php-init {{.buildroot}}/bin/php72-init
+install misc/php-init {{.buildroot}}/bin/php73-init
+install misc/php-init {{.buildroot}}/bin/php74-init
+
+sed -i 's/{{\\.var__pkgname}}/php71/g' {{.buildroot}}/bin/php71-init
+sed -i 's/{{\\.var__pkgname}}/php72/g' {{.buildroot}}/bin/php72-init
+sed -i 's/{{\\.var__pkgname}}/php73/g' {{.buildroot}}/bin/php73-init
+sed -i 's/{{\\.var__pkgname}}/php74/g' {{.buildroot}}/bin/php74-init
+"""
+

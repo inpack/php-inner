@@ -2,9 +2,9 @@
 
 set -e
 
-DAEMON=/home/action/apps/{{.var__pkgname}}/sbin/php-fpm
-PIDFILE=/home/action/apps/{{.var__pkgname}}/var/run/php-fpm.pid
-DAEMON_ARGS="-c /home/action/apps/{{.var__pkgname}}/etc --daemonize"
+DAEMON=/opt/php/{{.var__pkgname}}/sbin/php-fpm
+PIDFILE=/opt/php/{{.var__pkgname}}/var/run/php-fpm.pid
+DAEMON_ARGS="-c /opt/php/{{.var__pkgname}}/etc --daemonize"
 NAME=$(basename $DAEMON)
 
 

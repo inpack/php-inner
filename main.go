@@ -15,17 +15,15 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
-	"text/template"
 
 	"github.com/hooto/hflag4g/hflag"
 	"github.com/lessos/lessgo/types"
 	"github.com/sysinner/incore/inconf"
+	"github.com/sysinner/incore/inutils/filerender"
 )
 
 type mod struct {
@@ -48,7 +46,7 @@ var (
 	php_modini = "/opt/php/%s/etc/php.d/%s.ini"
 	php_fpmcfg = "/opt/php/%s/etc/php-fpm.conf"
 	php_fpmwww = "/opt/php/%s/etc/php-fpm.d/www.conf"
-	php_rels   = types.ArrayString([]string{"php71", "php72", "php73"})
+	php_rels   = types.ArrayString([]string{"php71", "php72", "php73", "php74"})
 	php_rel    = "php71"
 	php_mods   = []mod{
 		{"opcache", 10},
@@ -131,88 +129,30 @@ func base_set() error {
 
 	php_ini_path := fmt.Sprintf(php_ini, php_rel)
 
-	fp, err := os.Open(php_ini_path + ".default")
-	if err != nil {
-		return err
-	}
-	defer fp.Close()
-
-	src, err := ioutil.ReadAll(fp)
-	if err != nil {
-		return err
-	}
-
-	sets := map[string]string{
+	sets := map[string]interface{}{
 		"session__save_path": "/home/action/var/tmp",
 	}
-	//
-	tpl, err := template.New("s").Parse(string(src))
+
+	err := filerender.Render(php_ini_path+".default", php_ini_path, 0644, sets)
 	if err != nil {
 		return err
 	}
 
-	var dst bytes.Buffer
-	if err := tpl.Execute(&dst, sets); err != nil {
-		return err
-	}
-
-	fpdst, err := os.OpenFile(php_ini_path, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer fpdst.Close()
-
-	fpdst.Seek(0, 0)
-	fpdst.Truncate(0)
-
-	_, err = fpdst.Write(dst.Bytes())
-
-	return err
+	return nil
 }
 
 func fpm_on() error {
 
-	cfgs := []string{
-		fmt.Sprintf(php_fpmcfg, php_rel),
-		fmt.Sprintf(php_fpmwww, php_rel),
-	}
-
-	sets := map[string]string{}
+	var (
+		cfgs = []string{
+			fmt.Sprintf(php_fpmcfg, php_rel),
+			fmt.Sprintf(php_fpmwww, php_rel),
+		}
+		sets = map[string]interface{}{}
+	)
 
 	for _, v := range cfgs {
-
-		fp, err := os.Open(v + ".default")
-		if err != nil {
-			return err
-		}
-		defer fp.Close()
-
-		src, err := ioutil.ReadAll(fp)
-		if err != nil {
-			return err
-		}
-		//
-		tpl, err := template.New("s").Parse(string(src))
-		if err != nil {
-			return err
-		}
-
-		var dst bytes.Buffer
-		if err := tpl.Execute(&dst, sets); err != nil {
-			return err
-		}
-
-		fpdst, err := os.OpenFile(v, os.O_RDWR|os.O_CREATE, 0644)
-		if err != nil {
-			return err
-		}
-		defer fpdst.Close()
-
-		fpdst.Seek(0, 0)
-		fpdst.Truncate(0)
-
-		_, err = fpdst.Write(dst.Bytes())
-		if err != nil {
+		if err := filerender.Render(v+".default", v, 0644, sets); err != nil {
 			return err
 		}
 	}
